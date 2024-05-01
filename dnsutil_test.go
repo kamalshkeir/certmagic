@@ -13,8 +13,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
-	"go.uber.org/zap"
 )
 
 func TestLookupNameserversOK(t *testing.T) {
@@ -34,7 +32,7 @@ func TestLookupNameserversOK(t *testing.T) {
 		t.Run(test.fqdn, func(t *testing.T) {
 			t.Parallel()
 
-			nss, err := lookupNameservers(zap.NewNop(), test.fqdn, recursiveNameservers(nil))
+			nss, err := lookupNameservers(test.fqdn, recursiveNameservers(nil))
 			if err != nil {
 				t.Errorf("Expected no error, got: %v", err)
 			}
@@ -68,7 +66,7 @@ func TestLookupNameserversErr(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := lookupNameservers(zap.NewNop(), test.fqdn, nil)
+			_, err := lookupNameservers(test.fqdn, nil)
 			if err == nil {
 				t.Errorf("expected error, got none")
 			}
@@ -160,7 +158,7 @@ func TestFindZoneByFqdn(t *testing.T) {
 			}
 			clearFqdnCache()
 
-			zone, err := findZoneByFQDN(zap.NewNop(), test.fqdn, test.nameservers)
+			zone, err := findZoneByFQDN(test.fqdn, test.nameservers)
 			if test.expectedError != "" {
 				if err == nil {
 					t.Errorf("test %d: expected error, got none", i)

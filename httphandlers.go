@@ -19,8 +19,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/mholt/acmez/v2/acme"
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
+	"github.com/kamalshkeir/lg"
 )
 
 // HTTPChallengeHandler wraps h in a handler that can solve the ACME
@@ -74,21 +74,17 @@ func (am *ACMEIssuer) distributedHTTPChallengeSolver(w http.ResponseWriter, r *h
 	host := hostOnly(r.Host)
 	chalInfo, distributed, err := am.config.getChallengeInfo(r.Context(), host)
 	if err != nil {
-		am.Logger.Error("looking up info for HTTP challenge",
-			zap.String("host", host),
-			zap.String("remote_addr", r.RemoteAddr),
-			zap.String("user_agent", r.Header.Get("User-Agent")),
-			zap.Error(err))
+		lg.Error("looking up info for HTTP challenge", "host", host, "remote_addr", r.RemoteAddr, "user_agent", r.Header.Get("User-Agent"), "error", err)
 		return false
 	}
-	return solveHTTPChallenge(am.Logger, w, r, chalInfo.Challenge, distributed)
+	return solveHTTPChallenge(w, r, chalInfo.Challenge, distributed)
 }
 
 // solveHTTPChallenge solves the HTTP challenge using the given challenge information.
 // If the challenge is being solved in a distributed fahsion, set distributed to true for logging purposes.
 // It returns true the properties of the request check out in relation to the HTTP challenge.
 // Most of this code borrowed from xenolf's built-in HTTP-01 challenge solver in March 2018.
-func solveHTTPChallenge(logger *zap.Logger, w http.ResponseWriter, r *http.Request, challenge acme.Challenge, distributed bool) bool {
+func solveHTTPChallenge(w http.ResponseWriter, r *http.Request, challenge acme.Challenge, distributed bool) bool {
 	challengeReqPath := challenge.HTTP01ResourcePath()
 	if r.URL.Path == challengeReqPath &&
 		strings.EqualFold(hostOnly(r.Host), challenge.Identifier.Value) && // mitigate DNS rebinding attacks
@@ -96,11 +92,7 @@ func solveHTTPChallenge(logger *zap.Logger, w http.ResponseWriter, r *http.Reque
 		w.Header().Add("Content-Type", "text/plain")
 		w.Write([]byte(challenge.KeyAuthorization))
 		r.Close = true
-		logger.Info("served key authentication",
-			zap.String("identifier", challenge.Identifier.Value),
-			zap.String("challenge", "http-01"),
-			zap.String("remote", r.RemoteAddr),
-			zap.Bool("distributed", distributed))
+		lg.Info("served key authentication", "identifier", challenge.Identifier.Value, "challenge", "http-01", "remote", r.RemoteAddr, "distributed", distributed)
 		return true
 	}
 	return false
@@ -110,8 +102,8 @@ func solveHTTPChallenge(logger *zap.Logger, w http.ResponseWriter, r *http.Reque
 // from ACME servers trying to validate an identifier (i.e. LooksLikeHTTPChallenge() == true). It
 // returns true if the request criteria check out and it answered with key authentication, in which
 // case no further handling of the request is necessary.
-func SolveHTTPChallenge(logger *zap.Logger, w http.ResponseWriter, r *http.Request, challenge acme.Challenge) bool {
-	return solveHTTPChallenge(logger, w, r, challenge, false)
+func SolveHTTPChallenge(w http.ResponseWriter, r *http.Request, challenge acme.Challenge) bool {
+	return solveHTTPChallenge(w, r, challenge, false)
 }
 
 // LooksLikeHTTPChallenge returns true if r looks like an ACME
@@ -158,30 +150,20 @@ func (iss *ZeroSSLIssuer) distributedHTTPValidationAnswer(w http.ResponseWriter,
 	if iss == nil {
 		return false
 	}
-	logger := iss.Logger
-	if logger == nil {
-		logger = zap.NewNop()
-	}
 	host := hostOnly(r.Host)
 	valInfo, distributed, err := iss.getDistributedValidationInfo(r.Context(), host)
 	if err != nil {
-		logger.Error("looking up info for HTTP validation",
-			zap.String("host", host),
-			zap.String("remote_addr", r.RemoteAddr),
-			zap.String("user_agent", r.Header.Get("User-Agent")),
-			zap.Error(err))
+		lg.Error("looking up info for HTTP validation", "host", host, "remote_addr", r.RemoteAddr, "user_agent", r.Header.Get("User-Agent"), "error", err)
 		return false
 	}
-	return answerHTTPValidation(logger, w, r, valInfo, distributed)
+	return answerHTTPValidation(w, r, valInfo, distributed)
 }
 
-func answerHTTPValidation(logger *zap.Logger, rw http.ResponseWriter, req *http.Request, valInfo acme.Challenge, distributed bool) bool {
+func answerHTTPValidation(rw http.ResponseWriter, req *http.Request, valInfo acme.Challenge, distributed bool) bool {
 	// ensure URL matches
 	validationURL, err := url.Parse(valInfo.URL)
 	if err != nil {
-		logger.Error("got invalid URL from CA",
-			zap.String("file_validation_url", valInfo.URL),
-			zap.Error(err))
+		lg.Error("got invalid URL from CA", "file_validation_url", valInfo.URL, "error", err)
 		rw.WriteHeader(http.StatusInternalServerError)
 		return true
 	}
@@ -195,11 +177,7 @@ func answerHTTPValidation(logger *zap.Logger, rw http.ResponseWriter, req *http.
 
 	rw.Write([]byte(valInfo.Token))
 
-	logger.Info("served HTTP validation credential",
-		zap.String("validation_path", valInfo.URL),
-		zap.String("challenge", "http-01"),
-		zap.String("remote", req.RemoteAddr),
-		zap.Bool("distributed", distributed))
+	lg.Info("served HTTP validation credential", "validation_path", valInfo.URL, "challenge", "http-01", "remote", req.RemoteAddr, "distributed", distributed)
 
 	return true
 }

@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/lg"
 )
 
 // Storage is a type that implements a key-value store with
@@ -263,15 +263,12 @@ func (keys KeyBuilder) Safe(str string) string {
 // the locks are synchronizing, this should be
 // called only immediately before process exit.
 // Errors are only reported if a logger is given.
-func CleanUpOwnLocks(ctx context.Context, logger *zap.Logger) {
+func CleanUpOwnLocks(ctx context.Context) {
 	locksMu.Lock()
 	defer locksMu.Unlock()
 	for lockKey, storage := range locks {
 		if err := storage.Unlock(ctx, lockKey); err != nil {
-			logger.Error("unable to clean up lock in storage backend",
-				zap.Any("storage", storage),
-				zap.String("lock_key", lockKey),
-				zap.Error(err))
+			lg.Error("unable to clean up lock in storage backend", "storage", storage, "lock_key", lockKey, "error", err)
 			continue
 		}
 		delete(locks, lockKey)

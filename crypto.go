@@ -33,9 +33,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/kamalshkeir/lg"
 	"github.com/klauspost/cpuid/v2"
 	"github.com/zeebo/blake3"
-	"go.uber.org/zap"
 	"golang.org/x/net/idna"
 )
 
@@ -226,12 +226,7 @@ func (cfg *Config) loadCertResourceAnyIssuer(ctx context.Context, certNamesKey s
 		return certResources[j].decoded.NotBefore.Before(certResources[i].decoded.NotBefore)
 	})
 
-	cfg.Logger.Debug("loading managed certificate",
-		zap.String("domain", certNamesKey),
-		zap.Time("expiration", expiresAt(certResources[0].decoded)),
-		zap.String("issuer_key", certResources[0].issuer.IssuerKey()),
-		zap.Any("storage", cfg.Storage),
-	)
+	lg.Debug("loaded managed certificate", "domain", certNamesKey, "expiration", expiresAt(certResources[0].decoded), "issuer_key", certResources[0].issuer.IssuerKey(), "storage", cfg.Storage)
 
 	return certResources[0].CertificateResource, nil
 }

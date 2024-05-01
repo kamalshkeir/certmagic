@@ -29,11 +29,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kamalshkeir/certmagic/acmez"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
+	"github.com/kamalshkeir/lg"
 	"github.com/libdns/libdns"
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
 	"github.com/miekg/dns"
-	"go.uber.org/zap"
 )
 
 // httpSolver solves the HTTP challenge. It must be
@@ -358,9 +358,6 @@ type DNSManager struct {
 	// that the solver doesn't follow CNAME/NS record.
 	OverrideDomain string
 
-	// An optional logger.
-	Logger *zap.Logger
-
 	// Remember DNS records while challenges are active; i.e.
 	// records we have presented and not yet cleaned up.
 	// This lets us clean them up quickly and efficiently.
@@ -377,9 +374,8 @@ type DNSManager struct {
 }
 
 func (m *DNSManager) createRecord(ctx context.Context, dnsName, recordType, recordValue string) (zoneRecord, error) {
-	logger := m.logger()
 
-	zone, err := findZoneByFQDN(logger, dnsName, recursiveNameservers(m.Resolvers))
+	zone, err := findZoneByFQDN(dnsName, recursiveNameservers(m.Resolvers))
 	if err != nil {
 		return zoneRecord{}, fmt.Errorf("could not determine zone for domain %q: %v", dnsName, err)
 	}
@@ -390,13 +386,7 @@ func (m *DNSManager) createRecord(ctx context.Context, dnsName, recordType, reco
 		TTL:   m.TTL,
 	}
 
-	logger.Debug("creating DNS record",
-		zap.String("dns_name", dnsName),
-		zap.String("zone", zone),
-		zap.String("record_name", rec.Name),
-		zap.String("record_type", rec.Type),
-		zap.String("record_value", rec.Value),
-		zap.Duration("record_ttl", rec.TTL))
+	lg.Debug("creating DNS record", "dns_name", dnsName, "zone", zone, "record_name", rec.Name, "record_type", rec.Type, "record_value", rec.Value, "record_ttl", rec.TTL)
 
 	results, err := m.DNSProvider.AppendRecords(ctx, zone, []libdns.Record{rec})
 	if err != nil {
@@ -413,8 +403,6 @@ func (m *DNSManager) createRecord(ctx context.Context, dnsName, recordType, reco
 // authoritative lookups, i.e. until it has propagated, or until
 // timeout, whichever is first.
 func (m *DNSManager) wait(ctx context.Context, zrec zoneRecord) error {
-	logger := m.logger()
-
 	// if configured to, pause before doing propagation checks
 	// (even if they are disabled, the wait might be desirable on its own)
 	if m.PropagationDelay > 0 {
@@ -457,14 +445,10 @@ func (m *DNSManager) wait(ctx context.Context, zrec zoneRecord) error {
 			return ctx.Err()
 		}
 
-		logger.Debug("checking DNS propagation",
-			zap.String("fqdn", absName),
-			zap.String("record_type", zrec.record.Type),
-			zap.String("expected_value", zrec.record.Value),
-			zap.Strings("resolvers", resolvers))
+		lg.Debug("checking DNS propagation", "fqdn", absName, "record_type", zrec.record.Type, "expected_value", zrec.record.Value, "resolvers", resolvers)
 
 		var ready bool
-		ready, err = checkDNSPropagation(logger, absName, recType, zrec.record.Value, checkAuthoritativeServers, resolvers)
+		ready, err = checkDNSPropagation(absName, recType, zrec.record.Value, checkAuthoritativeServers, resolvers)
 		if err != nil {
 			return fmt.Errorf("checking DNS propagation of %q (relative=%s zone=%s resolvers=%v): %w", absName, zrec.record.Name, zrec.zone, resolvers, err)
 		}
@@ -488,8 +472,6 @@ type zoneRecord struct {
 // honor cancellation, which would result in cleanup being aborted.
 // Cleanup must always occur.
 func (m *DNSManager) cleanUpRecord(_ context.Context, zrec zoneRecord) error {
-	logger := m.logger()
-
 	// clean up the record - use a different context though, since
 	// one common reason cleanup is performed is because a context
 	// was canceled, and if so, any HTTP requests by this provider
@@ -502,26 +484,13 @@ func (m *DNSManager) cleanUpRecord(_ context.Context, zrec zoneRecord) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	logger.Debug("deleting DNS record",
-		zap.String("zone", zrec.zone),
-		zap.String("record_id", zrec.record.ID),
-		zap.String("record_name", zrec.record.Name),
-		zap.String("record_type", zrec.record.Type),
-		zap.String("record_value", zrec.record.Value))
+	lg.Debug("deleting DNS record", "zone", zrec.zone, "record_id", zrec.record.ID, "record_name", zrec.record.Name, "record_type", zrec.record.Type, "record_value", zrec.record.Value)
 
 	_, err := m.DNSProvider.DeleteRecords(ctx, zrec.zone, []libdns.Record{zrec.record})
 	if err != nil {
 		return fmt.Errorf("deleting temporary record for name %q in zone %q: %w", zrec.zone, zrec.record, err)
 	}
 	return nil
-}
-
-func (m *DNSManager) logger() *zap.Logger {
-	logger := m.Logger
-	if logger == nil {
-		logger = zap.NewNop()
-	}
-	return logger.Named("dns_manager")
 }
 
 const defaultDNSPropagationTimeout = 2 * time.Minute

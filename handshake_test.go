@@ -24,9 +24,8 @@ func TestGetCertificate(t *testing.T) {
 	c := &Cache{
 		cache:      make(map[string]Certificate),
 		cacheIndex: make(map[string][]string),
-		logger:     defaultTestLogger,
 	}
-	cfg := &Config{Logger: defaultTestLogger, certCache: c}
+	cfg := &Config{certCache: c}
 
 	// create a test connection for conn.LocalAddr()
 	l, _ := net.Listen("tcp", "127.0.0.1:0")

@@ -14,17 +14,4 @@
 
 package certmagic
 
-import (
-	"os"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-)
-
 // TODO
-
-var defaultTestLogger = zap.New(zapcore.NewCore(
-	zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
-	os.Stderr,
-	zap.DebugLevel,
-))

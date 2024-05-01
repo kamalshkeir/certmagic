@@ -26,9 +26,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/certmagic/acmez"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
+	"github.com/kamalshkeir/lg"
 )
 
 // acmeClient holds state necessary to perform ACME operations
@@ -174,7 +174,6 @@ func (iss *ACMEIssuer) newACMEClient(useTestCA bool) (*acmez.Client, error) {
 		},
 		ChallengeSolvers: make(map[string]acmez.Solver),
 	}
-	client.Logger = iss.Logger.Named("acme_client")
 
 	// configure challenges (most of the time, DNS challenge is
 	// exclusive of other ones because it is usually only used
@@ -265,20 +264,13 @@ func (c *acmeClient) throttle(ctx context.Context, names []string) error {
 		// TODO: stop rate limiter when it is garbage-collected...
 	}
 	rateLimitersMu.Unlock()
-	c.iss.Logger.Info("waiting on internal rate limiter",
-		zap.Strings("identifiers", names),
-		zap.String("ca", c.acmeClient.Directory),
-		zap.String("account", email),
-	)
+	lg.Info("waiting on internal rate limiter")
+	lg.Info("waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
 	err := rl.Wait(ctx)
 	if err != nil {
 		return err
 	}
-	c.iss.Logger.Info("done waiting on internal rate limiter",
-		zap.Strings("identifiers", names),
-		zap.String("ca", c.acmeClient.Directory),
-		zap.String("account", email),
-	)
+	lg.Info("done waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
 	return nil
 }
 

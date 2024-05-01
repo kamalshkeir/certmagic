@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/lg"
 )
 
 // Cache is a structure that stores certificates in memory.
@@ -65,8 +65,6 @@ type Cache struct {
 
 	// Used to signal when stopping is completed
 	doneChan chan struct{}
-
-	logger *zap.Logger
 }
 
 // NewCache returns a new, valid Cache for efficiently
@@ -116,12 +114,6 @@ func NewCache(opts CacheOptions) *Cache {
 		cacheIndex: make(map[string][]string),
 		stopChan:   make(chan struct{}),
 		doneChan:   make(chan struct{}),
-		logger:     opts.Logger,
-	}
-
-	// absolutely do not allow a nil logger; panics galore
-	if c.logger == nil {
-		c.logger = defaultLogger
 	}
 
 	go c.maintainAssets(0)
@@ -179,9 +171,6 @@ type CacheOptions struct {
 	// If reached, certificates will be randomly evicted to
 	// make room for new ones. 0 means unlimited.
 	Capacity int
-
-	// Set a logger to enable logging
-	Logger *zap.Logger
 }
 
 // ConfigGetter is a function that returns a prepared,
@@ -221,13 +210,7 @@ func (certCache *Cache) unsyncedCacheCertificate(cert Certificate) {
 			logMsg += "; appended any missing tags to cert"
 		}
 
-		certCache.logger.Debug(logMsg,
-			zap.Strings("subjects", cert.Names),
-			zap.Time("expiration", expiresAt(cert.Leaf)),
-			zap.Bool("managed", cert.managed),
-			zap.String("issuer_key", cert.issuerKey),
-			zap.String("hash", cert.hash),
-			zap.Strings("tags", cert.Tags))
+		lg.Debug(logMsg, "subjects", cert.Names, "expiration", expiresAt(cert.Leaf), "managed", cert.managed, "issuer_key", cert.issuerKey, "hash", cert.hash, "tags", cert.Tags)
 		return
 	}
 
@@ -247,11 +230,7 @@ func (certCache *Cache) unsyncedCacheCertificate(cert Certificate) {
 		i := 0
 		for _, randomCert := range certCache.cache {
 			if i == rnd {
-				certCache.logger.Debug("cache full; evicting random certificate",
-					zap.Strings("removing_subjects", randomCert.Names),
-					zap.String("removing_hash", randomCert.hash),
-					zap.Strings("inserting_subjects", cert.Names),
-					zap.String("inserting_hash", cert.hash))
+				lg.Debug("cache full; evicting random certificate", "removing_subjects", randomCert.Names, "removing_hash", randomCert.hash, "inserting_subjects", cert.Names, "inserting_hash", cert.hash)
 				certCache.removeCertificate(randomCert)
 				break
 			}
@@ -268,14 +247,7 @@ func (certCache *Cache) unsyncedCacheCertificate(cert Certificate) {
 	}
 
 	certCache.optionsMu.RLock()
-	certCache.logger.Debug("added certificate to cache",
-		zap.Strings("subjects", cert.Names),
-		zap.Time("expiration", expiresAt(cert.Leaf)),
-		zap.Bool("managed", cert.managed),
-		zap.String("issuer_key", cert.issuerKey),
-		zap.String("hash", cert.hash),
-		zap.Int("cache_size", len(certCache.cache)),
-		zap.Int("cache_capacity", certCache.options.Capacity))
+	lg.Debug("added certificate to cache", "subjects", cert.Names, "expiration", expiresAt(cert.Leaf), "managed", cert.managed, "issuer_key", cert.issuerKey, "hash", cert.hash, "tags", cert.Tags)
 	certCache.optionsMu.RUnlock()
 }
 
@@ -304,14 +276,7 @@ func (certCache *Cache) removeCertificate(cert Certificate) {
 	delete(certCache.cache, cert.hash)
 
 	certCache.optionsMu.RLock()
-	certCache.logger.Debug("removed certificate from cache",
-		zap.Strings("subjects", cert.Names),
-		zap.Time("expiration", expiresAt(cert.Leaf)),
-		zap.Bool("managed", cert.managed),
-		zap.String("issuer_key", cert.issuerKey),
-		zap.String("hash", cert.hash),
-		zap.Int("cache_size", len(certCache.cache)),
-		zap.Int("cache_capacity", certCache.options.Capacity))
+	lg.Debug("removed certificate from cache", "subjects", cert.Names, "expiration", expiresAt(cert.Leaf), "managed", cert.managed, "issuer_key", cert.issuerKey, "hash", cert.hash)
 	certCache.optionsMu.RUnlock()
 }
 
@@ -324,9 +289,7 @@ func (certCache *Cache) replaceCertificate(oldCert, newCert Certificate) {
 	certCache.removeCertificate(oldCert)
 	certCache.unsyncedCacheCertificate(newCert)
 	certCache.mu.Unlock()
-	certCache.logger.Info("replaced certificate in cache",
-		zap.Strings("subjects", newCert.Names),
-		zap.Time("new_expiration", expiresAt(newCert.Leaf)))
+	lg.Info("replaced certificate in cache", "subjects", newCert.Names, "new_expiration", expiresAt(newCert.Leaf))
 }
 
 // getAllMatchingCerts returns all certificates with exactly this subject

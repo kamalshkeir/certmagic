@@ -23,8 +23,8 @@ import (
 )
 
 func TestUnexportedGetCertificate(t *testing.T) {
-	certCache := &Cache{cache: make(map[string]Certificate), cacheIndex: make(map[string][]string), logger: defaultTestLogger}
-	cfg := &Config{Logger: defaultTestLogger, certCache: certCache}
+	certCache := &Cache{cache: make(map[string]Certificate), cacheIndex: make(map[string][]string)}
+	cfg := &Config{certCache: certCache}
 
 	// When cache is empty
 	if _, matched, defaulted := cfg.getCertificateFromCache(&tls.ClientHelloInfo{ServerName: "example.com"}); matched || defaulted {
@@ -53,7 +53,7 @@ func TestUnexportedGetCertificate(t *testing.T) {
 }
 
 func TestCacheCertificate(t *testing.T) {
-	certCache := &Cache{cache: make(map[string]Certificate), cacheIndex: make(map[string][]string), logger: defaultTestLogger}
+	certCache := &Cache{cache: make(map[string]Certificate), cacheIndex: make(map[string][]string)}
 
 	certCache.cacheCertificate(Certificate{Names: []string{"example.com", "sub.example.com"}, hash: "foobar", Certificate: tls.Certificate{Leaf: &x509.Certificate{NotAfter: time.Now()}}})
 	if len(certCache.cache) != 1 {

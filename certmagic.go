@@ -43,14 +43,10 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var UsedHTTPServer *http.Server
@@ -454,15 +450,7 @@ var Default = Config{
 	RenewalWindowRatio: DefaultRenewalWindowRatio,
 	Storage:            defaultFileStorage,
 	KeySource:          DefaultKeyGenerator,
-	Logger:             defaultLogger,
 }
-
-// defaultLogger is guaranteed to be a non-nil fallback logger.
-var defaultLogger = zap.New(zapcore.NewCore(
-	zapcore.NewConsoleEncoder(zap.NewProductionEncoderConfig()),
-	os.Stderr,
-	zap.InfoLevel,
-))
 
 const (
 	// HTTPChallengePort is the officially-designated port for

@@ -28,9 +28,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/certmagic/acmez"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
+	"github.com/kamalshkeir/lg"
 )
 
 // ACMEIssuer gets certificates using ACME. It implements the PreChecker,
@@ -131,11 +131,6 @@ type ACMEIssuer struct {
 	// certificate chains
 	PreferredChains ChainPreference
 
-	// Set a logger to configure logging; a default
-	// logger must always be set; if no logging is
-	// desired, set this to zap.NewNop().
-	Logger *zap.Logger
-
 	// Set a http proxy to use when issuing a certificate.
 	// Default is http.ProxyFromEnvironment
 	HTTPProxy func(*http.Request) (*url.URL, error)
@@ -225,14 +220,6 @@ func NewACMEIssuer(cfg *Config, template ACMEIssuer) *ACMEIssuer {
 	}
 	if template.NewAccountFunc == nil {
 		template.NewAccountFunc = DefaultACME.NewAccountFunc
-	}
-	if template.Logger == nil {
-		template.Logger = DefaultACME.Logger
-	}
-
-	// absolutely do not allow a nil logger; that would panic
-	if template.Logger == nil {
-		template.Logger = defaultLogger
 	}
 
 	if template.HTTPProxy == nil {
@@ -452,19 +439,13 @@ func (am *ACMEIssuer) doIssue(ctx context.Context, csr *x509.CertificateRequest,
 	// do this in a loop because there's an error case that may necessitate a retry, but not more than once
 	var certChains []acme.Certificate
 	for i := 0; i < 2; i++ {
-		am.Logger.Info("using ACME account",
-			zap.String("account_id", params.Account.Location),
-			zap.Strings("account_contact", params.Account.Contact))
+		lg.Info("using ACME account", "account_id", params.Account.Location, "account_contact", params.Account.Contact)
 
 		certChains, err = client.acmeClient.ObtainCertificate(ctx, params)
 		if err != nil {
 			var prob acme.Problem
 			if errors.As(err, &prob) && prob.Type == acme.ProblemTypeAccountDoesNotExist {
-				am.Logger.Warn("ACME account does not exist on server; attempting to recreate",
-					zap.String("account_id", client.account.Location),
-					zap.Strings("account_contact", client.account.Contact),
-					zap.String("key_location", am.storageKeyUserPrivateKey(client.acmeClient.Directory, am.getEmail())),
-					zap.Object("problem", prob))
+				lg.Warn("ACME account does not exist on server; attempting to recreate", "account_id", client.account.Location, "account_contact", client.account.Contact, "key_location", am.storageKeyUserPrivateKey(client.acmeClient.Directory, am.getEmail()), "problem", prob)
 
 				// the account we have no longer exists on the CA, so we need to create a new one;
 				// we could use the same key pair, but this is a good opportunity to rotate keys
@@ -497,7 +478,7 @@ func (am *ACMEIssuer) doIssue(ctx context.Context, csr *x509.CertificateRequest,
 		Metadata:    preferredChain,
 	}
 
-	am.Logger.Debug("selected certificate chain", zap.String("url", preferredChain.URL))
+	lg.Debug("selected certificate chain", "url", preferredChain.URL)
 
 	return ic, usingTestCA, nil
 }
@@ -508,8 +489,7 @@ func (am *ACMEIssuer) doIssue(ctx context.Context, csr *x509.CertificateRequest,
 func (am *ACMEIssuer) selectPreferredChain(certChains []acme.Certificate) acme.Certificate {
 	if len(certChains) == 1 {
 		if len(am.PreferredChains.AnyCommonName) > 0 || len(am.PreferredChains.RootCommonName) > 0 {
-			am.Logger.Debug("there is only one chain offered; selecting it regardless of preferences",
-				zap.String("chain_url", certChains[0].URL))
+			lg.Debug("there is only one chain offered; selecting it regardless of preferences", "url", certChains[0].URL)
 		}
 		return certChains[0]
 	}
@@ -532,9 +512,7 @@ func (am *ACMEIssuer) selectPreferredChain(certChains []acme.Certificate) acme.C
 		for i, chain := range certChains {
 			certs, err := parseCertsFromPEMBundle(chain.ChainPEM)
 			if err != nil {
-				am.Logger.Error("unable to parse PEM certificate chain",
-					zap.Int("chain", i),
-					zap.Error(err))
+				lg.Error("unable to parse PEM certificate chain", "url", chain.URL, "error", err)
 				continue
 			}
 			decodedChains[i] = certs
@@ -545,9 +523,7 @@ func (am *ACMEIssuer) selectPreferredChain(certChains []acme.Certificate) acme.C
 				for i, chain := range decodedChains {
 					for _, cert := range chain {
 						if cert.Issuer.CommonName == prefAnyCN {
-							am.Logger.Debug("found preferred certificate chain by issuer common name",
-								zap.String("preference", prefAnyCN),
-								zap.Int("chain", i))
+							lg.Debug("found preferred certificate chain by issuer common name", "url", certChains[i].URL)
 							return certChains[i]
 						}
 					}
@@ -559,16 +535,14 @@ func (am *ACMEIssuer) selectPreferredChain(certChains []acme.Certificate) acme.C
 			for _, prefRootCN := range am.PreferredChains.RootCommonName {
 				for i, chain := range decodedChains {
 					if chain[len(chain)-1].Issuer.CommonName == prefRootCN {
-						am.Logger.Debug("found preferred certificate chain by root common name",
-							zap.String("preference", prefRootCN),
-							zap.Int("chain", i))
+						lg.Debug("found preferred certificate chain by root common name", "preference", prefRootCN, "url", certChains[i].URL)
 						return certChains[i]
 					}
 				}
 			}
 		}
 
-		am.Logger.Warn("did not find chain matching preferences; using first")
+		lg.Warn("did not find chain matching preferences; using first", "url", certChains[0].URL)
 	}
 
 	return certChains[0]
@@ -610,7 +584,6 @@ type ChainPreference struct {
 var DefaultACME = ACMEIssuer{
 	CA:        LetsEncryptProductionCA,
 	TestCA:    LetsEncryptStagingCA,
-	Logger:    defaultLogger,
 	HTTPProxy: http.ProxyFromEnvironment,
 }
 

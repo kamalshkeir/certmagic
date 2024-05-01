@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/lg"
 	"golang.org/x/crypto/ocsp"
 )
 
@@ -130,7 +130,7 @@ func expiresAt(cert *x509.Certificate) time.Time {
 //
 // This method is safe for concurrent use.
 func (cfg *Config) CacheManagedCertificate(ctx context.Context, domain string) (Certificate, error) {
-	domain = cfg.transformSubject(ctx, nil, domain)
+	domain = cfg.transformSubject(ctx, domain)
 	cert, err := cfg.loadManagedCertificate(ctx, domain)
 	if err != nil {
 		return cert, err
@@ -187,17 +187,13 @@ func (cfg *Config) CacheUnmanagedTLSCertificate(ctx context.Context, tlsCert tls
 		return "", err
 	}
 	if time.Now().After(cert.Leaf.NotAfter) {
-		cfg.Logger.Warn("unmanaged certificate has expired",
-			zap.Time("not_after", cert.Leaf.NotAfter),
-			zap.Strings("sans", cert.Names))
+		lg.Warn("unmanaged certificate has expired", "not_after", cert.Leaf.NotAfter, "sans", cert.Names)
 	} else if time.Until(cert.Leaf.NotAfter) < 24*time.Hour {
-		cfg.Logger.Warn("unmanaged certificate expires within 1 day",
-			zap.Time("not_after", cert.Leaf.NotAfter),
-			zap.Strings("sans", cert.Names))
+		lg.Warn("unmanaged certificate expires soon", "not_after", cert.Leaf.NotAfter, "sans", cert.Names)
 	}
 	err = stapleOCSP(ctx, cfg.OCSP, cfg.Storage, &cert, nil)
 	if err != nil {
-		cfg.Logger.Warn("stapling OCSP", zap.Error(err))
+		lg.Warn("stapling OCSP failed", "not_after", cert.Leaf.NotAfter, "sans", cert.Names)
 	}
 	cfg.emit(ctx, "cached_unmanaged_cert", map[string]any{"sans": cert.Names})
 	cert.Tags = tags
@@ -246,7 +242,7 @@ func (cfg Config) makeCertificateWithOCSP(ctx context.Context, certPEMBlock, key
 	}
 	err = stapleOCSP(ctx, cfg.OCSP, cfg.Storage, &cert, certPEMBlock)
 	if err != nil {
-		cfg.Logger.Warn("stapling OCSP", zap.Error(err), zap.Strings("identifiers", cert.Names))
+		lg.Warn("stapling OCSP failed", "not_after", cert.Leaf.NotAfter, "sans", cert.Names)
 	}
 	return cert, nil
 }
@@ -353,8 +349,8 @@ func (cfg *Config) managedCertInStorageExpiresSoon(ctx context.Context, cert Cer
 // to the new cert. It assumes that the new certificate for oldCert.Names[0] is
 // already in storage. It returns the newly-loaded certificate if successful.
 func (cfg *Config) reloadManagedCertificate(ctx context.Context, oldCert Certificate) (Certificate, error) {
-	cfg.Logger.Info("reloading managed certificate", zap.Strings("identifiers", oldCert.Names))
 	newCert, err := cfg.loadManagedCertificate(ctx, oldCert.Names[0])
+	lg.Info("reloading managed certificate", "identifiers", oldCert.Names)
 	if err != nil {
 		return Certificate{}, fmt.Errorf("loading managed certificate for %v from storage: %v", oldCert.Names, err)
 	}

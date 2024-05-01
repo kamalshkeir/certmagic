@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/mholt/acmez/v2/acme"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
 )
 
 func TestSaveCertResource(t *testing.T) {
@@ -30,7 +30,6 @@ func TestSaveCertResource(t *testing.T) {
 	testConfig := &Config{
 		Issuers:   []Issuer{am},
 		Storage:   &FileStorage{Path: "./_testdata_tmp"},
-		Logger:    defaultTestLogger,
 		certCache: new(Cache),
 	}
 	am.config = testConfig

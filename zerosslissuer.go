@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/kamalshkeir/certmagic/zerossl"
+	"github.com/kamalshkeir/lg"
 
-	"github.com/mholt/acmez/v2"
-	"github.com/mholt/acmez/v2/acme"
-	"go.uber.org/zap"
+	"github.com/kamalshkeir/certmagic/acmez"
+	"github.com/kamalshkeir/certmagic/acmez/acme"
 )
 
 // ZeroSSLIssuer can get certificates from ZeroSSL's API. (To use ZeroSSL's ACME
@@ -59,9 +59,6 @@ type ZeroSSLIssuer struct {
 	// Set this on all instances in a cluster to the same
 	// value to enable distributed verification.
 	Storage Storage
-
-	// An optional (but highly recommended) logger.
-	Logger *zap.Logger
 }
 
 // Issue obtains a certificate for the given csr.
@@ -73,29 +70,22 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		return nil, fmt.Errorf("no identifiers on CSR")
 	}
 
-	logger := iss.Logger
-	if logger == nil {
-		logger = zap.NewNop()
-	}
-	logger = logger.With(zap.Strings("identifiers", identifiers))
-
-	logger.Info("creating certificate")
+	lg.Info("creating certificate")
 
 	cert, err := client.CreateCertificate(ctx, csr, iss.ValidityDays)
 	if err != nil {
 		return nil, fmt.Errorf("creating certificate: %v", err)
 	}
 
-	logger = logger.With(zap.String("cert_id", cert.ID))
-	logger.Info("created certificate")
+	lg.Info("created certificate", "cert_id", cert.ID)
 
 	defer func(certID string) {
 		if err != nil {
 			err := client.CancelCertificate(context.WithoutCancel(ctx), certID)
 			if err == nil {
-				logger.Info("canceled certificate")
+				lg.Info("canceled certificate", "cert_id", cert.ID)
 			} else {
-				logger.Error("unable to cancel certificate", zap.Error(err))
+				lg.Error("unable to cancel certificate", "err", err, "cert_id", cert.ID)
 			}
 		}
 	}(cert.ID)
@@ -104,7 +94,6 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 
 	if iss.CNAMEValidation == nil {
 		verificationMethod = zerossl.HTTPVerification
-		logger = logger.With(zap.String("verification_method", string(verificationMethod)))
 
 		httpVerifier := &httpSolver{
 			address: net.JoinHostPort(iss.ListenHost, strconv.Itoa(iss.getHTTPPort())),
@@ -139,7 +128,6 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		defer solver.CleanUp(ctx, fakeChallenge)
 	} else {
 		verificationMethod = zerossl.CNAMEVerification
-		logger = logger.With(zap.String("verification_method", string(verificationMethod)))
 
 		// create the CNAME record(s)
 		records := make(map[string]zoneRecord, len(cert.Validation.OtherMethods))
@@ -150,9 +138,7 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 			}
 			defer func(name string, zr zoneRecord) {
 				if err := iss.CNAMEValidation.cleanUpRecord(ctx, zr); err != nil {
-					logger.Warn("cleaning up temporary validation record failed",
-						zap.String("dns_name", name),
-						zap.Error(err))
+					lg.Warn("cleaning up temporary CNAME record", "dns_name", name, "err", err, "verification_method", string(verificationMethod))
 				}
 			}(name, zr)
 			records[name] = zr
@@ -162,12 +148,12 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		for name, zr := range records {
 			if err := iss.CNAMEValidation.wait(ctx, zr); err != nil {
 				// allow it, since the CA will ultimately decide, but definitely log it
-				logger.Warn("failed CNAME record propagation check", zap.String("domain", name), zap.Error(err))
+				lg.Warn("failed CNAME record propagation check", "dns_name", name, "err", err, "verification_method", string(verificationMethod))
 			}
 		}
 	}
 
-	logger.Info("validating identifiers")
+	lg.Info("validating identifiers")
 
 	cert, err = client.VerifyIdentifiers(ctx, cert.ID, verificationMethod, nil)
 	if err != nil {
@@ -176,14 +162,14 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 
 	switch cert.Status {
 	case "pending_validation":
-		logger.Info("validations succeeded; waiting for certificate to be issued")
+		lg.Info("validations succeeded; waiting for certificate to be issued")
 
 		cert, err = iss.waitForCertToBeIssued(ctx, client, cert)
 		if err != nil {
 			return nil, fmt.Errorf("waiting for certificate to be issued: %v", err)
 		}
 	case "issued":
-		logger.Info("validations succeeded; downloading certificate bundle")
+		lg.Info("validations succeeded; downloading certificate bundle")
 	default:
 		return nil, fmt.Errorf("unexpected certificate status: %s", cert.Status)
 	}
@@ -193,7 +179,7 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		return nil, fmt.Errorf("downloading certificate: %v", err)
 	}
 
-	logger.Info("successfully downloaded issued certificate")
+	lg.Info("successfully downloaded issued certificate")
 
 	return &IssuedCertificate{
 		Certificate: []byte(bundle.CertificateCrt + bundle.CABundleCrt),

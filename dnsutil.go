@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kamalshkeir/lg"
 	"github.com/miekg/dns"
-	"go.uber.org/zap"
 )
 
 // Code in this file adapted from go-acme/lego, July 2020:
@@ -21,20 +21,18 @@ import (
 // findZoneByFQDN determines the zone apex for the given fqdn by recursing
 // up the domain labels until the nameserver returns a SOA record in the
 // answer section. The logger must be non-nil.
-func findZoneByFQDN(logger *zap.Logger, fqdn string, nameservers []string) (string, error) {
+func findZoneByFQDN(fqdn string, nameservers []string) (string, error) {
 	if !strings.HasSuffix(fqdn, ".") {
 		fqdn += "."
 	}
-	soa, err := lookupSoaByFqdn(logger, fqdn, nameservers)
+	soa, err := lookupSoaByFqdn(fqdn, nameservers)
 	if err != nil {
 		return "", err
 	}
 	return soa.zone, nil
 }
 
-func lookupSoaByFqdn(logger *zap.Logger, fqdn string, nameservers []string) (*soaCacheEntry, error) {
-	logger = logger.Named("soa_lookup")
-
+func lookupSoaByFqdn(fqdn string, nameservers []string) (*soaCacheEntry, error) {
 	if !strings.HasSuffix(fqdn, ".") {
 		fqdn += "."
 	}
@@ -44,11 +42,11 @@ func lookupSoaByFqdn(logger *zap.Logger, fqdn string, nameservers []string) (*so
 
 	// prefer cached version if fresh
 	if ent := fqdnSOACache[fqdn]; ent != nil && !ent.isExpired() {
-		logger.Debug("using cached SOA result", zap.String("entry", ent.zone))
+		lg.Debug("using cached SOA result", "entry", ent.zone)
 		return ent, nil
 	}
 
-	ent, err := fetchSoaByFqdn(logger, fqdn, nameservers)
+	ent, err := fetchSoaByFqdn(fqdn, nameservers)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +64,7 @@ func lookupSoaByFqdn(logger *zap.Logger, fqdn string, nameservers []string) (*so
 	return ent, nil
 }
 
-func fetchSoaByFqdn(logger *zap.Logger, fqdn string, nameservers []string) (*soaCacheEntry, error) {
+func fetchSoaByFqdn(fqdn string, nameservers []string) (*soaCacheEntry, error) {
 	var err error
 	var in *dns.Msg
 
@@ -81,7 +79,7 @@ func fetchSoaByFqdn(logger *zap.Logger, fqdn string, nameservers []string) (*soa
 		if in == nil {
 			continue
 		}
-		logger.Debug("fetched SOA", zap.String("msg", in.String()))
+		lg.Debug("fetched SOA", "msg", in.String())
 
 		switch in.Rcode {
 		case dns.RcodeSuccess:
@@ -216,9 +214,7 @@ func populateNameserverPorts(servers []string) {
 }
 
 // checkDNSPropagation checks if the expected record has been propagated to all authoritative nameservers.
-func checkDNSPropagation(logger *zap.Logger, fqdn string, recType uint16, expectedValue string, checkAuthoritativeServers bool, resolvers []string) (bool, error) {
-	logger = logger.Named("propagation")
-
+func checkDNSPropagation(fqdn string, recType uint16, expectedValue string, checkAuthoritativeServers bool, resolvers []string) (bool, error) {
 	if !strings.HasSuffix(fqdn, ".") {
 		fqdn += "."
 	}
@@ -237,14 +233,14 @@ func checkDNSPropagation(logger *zap.Logger, fqdn string, recType uint16, expect
 	}
 
 	if checkAuthoritativeServers {
-		authoritativeServers, err := lookupNameservers(logger, fqdn, resolvers)
+		authoritativeServers, err := lookupNameservers(fqdn, resolvers)
 		if err != nil {
 			return false, fmt.Errorf("looking up authoritative nameservers: %v", err)
 		}
 		populateNameserverPorts(authoritativeServers)
 		resolvers = authoritativeServers
 	}
-	logger.Debug("checking authoritative nameservers", zap.Strings("resolvers", resolvers))
+	lg.Debug("checking authoritative nameservers", "resolvers", resolvers, "type", "propagation")
 
 	return checkAuthoritativeNss(fqdn, recType, expectedValue, resolvers)
 }
@@ -293,10 +289,10 @@ func checkAuthoritativeNss(fqdn string, recType uint16, expectedValue string, na
 }
 
 // lookupNameservers returns the authoritative nameservers for the given fqdn.
-func lookupNameservers(logger *zap.Logger, fqdn string, resolvers []string) ([]string, error) {
+func lookupNameservers(fqdn string, resolvers []string) ([]string, error) {
 	var authoritativeNss []string
 
-	zone, err := findZoneByFQDN(logger, fqdn, resolvers)
+	zone, err := findZoneByFQDN(fqdn, resolvers)
 	if err != nil {
 		return nil, fmt.Errorf("could not determine the zone for '%s': %w", fqdn, err)
 	}
