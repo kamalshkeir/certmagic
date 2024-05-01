@@ -92,7 +92,7 @@ func solveHTTPChallenge(w http.ResponseWriter, r *http.Request, challenge acme.C
 		w.Header().Add("Content-Type", "text/plain")
 		w.Write([]byte(challenge.KeyAuthorization))
 		r.Close = true
-		lg.Info("served key authentication", "identifier", challenge.Identifier.Value, "challenge", "http-01", "remote", r.RemoteAddr, "distributed", distributed)
+		lg.Debug("served key authentication", "identifier", challenge.Identifier.Value, "challenge", "http-01", "remote", r.RemoteAddr, "distributed", distributed)
 		return true
 	}
 	return false
@@ -177,7 +177,7 @@ func answerHTTPValidation(rw http.ResponseWriter, req *http.Request, valInfo acm
 
 	rw.Write([]byte(valInfo.Token))
 
-	lg.Info("served HTTP validation credential", "validation_path", valInfo.URL, "challenge", "http-01", "remote", req.RemoteAddr, "distributed", distributed)
+	lg.Debug("served HTTP validation credential", "validation_path", valInfo.URL, "challenge", "http-01", "remote", req.RemoteAddr, "distributed", distributed)
 
 	return true
 }

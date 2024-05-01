@@ -494,7 +494,7 @@ func (cfg *Config) obtainCert(ctx context.Context, name string, interactive bool
 		return fmt.Errorf("failed storage check: %v - storage is probably misconfigured", err)
 	}
 
-	lg.Info("acquiring lock", "identifier", name)
+	lg.Debug("acquiring lock", "identifier", name)
 
 	// ensure idempotency of the obtain operation for this name
 	lockKey := cfg.lockKey(certIssueLockOp, name)
@@ -503,21 +503,21 @@ func (cfg *Config) obtainCert(ctx context.Context, name string, interactive bool
 		return fmt.Errorf("unable to acquire lock '%s': %v", lockKey, err)
 	}
 	defer func() {
-		lg.Info("releasing lock", "identifier", name)
+		lg.Debug("releasing lock", "identifier", name)
 		if err := releaseLock(ctx, cfg.Storage, lockKey); err != nil {
 			lg.Error("unable to unlock", "identifier", name, "lock_key", lockKey, "error", err)
 		}
 	}()
-	lg.Info("lock acquired", "identifier", name)
+	lg.Debug("lock acquired", "identifier", name)
 
 	f := func(ctx context.Context) error {
 		// check if obtain is still needed -- might have been obtained during lock
 		if cfg.storageHasCertResourcesAnyIssuer(ctx, name) {
-			lg.Info("certificate already exists in storage", "identifier", name)
+			lg.Debug("certificate already exists in storage", "identifier", name)
 			return nil
 		}
 
-		lg.Info("obtaining certificate", "identifier", name)
+		lg.Debug("obtaining certificate", "identifier", name)
 
 		if err := cfg.emit(ctx, "cert_obtaining", map[string]any{"identifier": name}); err != nil {
 			return fmt.Errorf("obtaining certificate aborted by event handler: %w", err)
@@ -627,7 +627,7 @@ func (cfg *Config) obtainCert(ctx context.Context, name string, interactive bool
 			return fmt.Errorf("[%s] Obtain: saving assets: %v", name, err)
 		}
 
-		lg.Info("certificate obtained successfully", "identifier", name, "issuer", issuerUsed.IssuerKey())
+		lg.Debug("certificate obtained successfully", "identifier", name, "issuer", issuerUsed.IssuerKey())
 
 		certKey := certRes.NamesKey()
 
@@ -736,7 +736,7 @@ func (cfg *Config) renewCert(ctx context.Context, name string, force, interactiv
 		return fmt.Errorf("failed storage check: %v - storage is probably misconfigured", err)
 	}
 
-	lg.Info("acquiring lock", "identifier", name)
+	lg.Debug("acquiring lock", "identifier", name)
 
 	// ensure idempotency of the renew operation for this name
 	lockKey := cfg.lockKey(certIssueLockOp, name)
@@ -745,13 +745,13 @@ func (cfg *Config) renewCert(ctx context.Context, name string, force, interactiv
 		return fmt.Errorf("unable to acquire lock '%s': %v", lockKey, err)
 	}
 	defer func() {
-		lg.Info("releasing lock", "identifier", name)
+		lg.Debug("releasing lock", "identifier", name)
 
 		if err := releaseLock(ctx, cfg.Storage, lockKey); err != nil {
 			lg.Error("unable to unlock", "identifier", name, "lock_key", lockKey, "error", err)
 		}
 	}()
-	lg.Info("lock acquired", "identifier", name)
+	lg.Debug("lock acquired", "identifier", name)
 
 	f := func(ctx context.Context) error {
 		// prepare for renewal (load PEM cert, key, and meta)
@@ -764,14 +764,14 @@ func (cfg *Config) renewCert(ctx context.Context, name string, force, interactiv
 		timeLeft, needsRenew := cfg.managedCertNeedsRenewal(certRes)
 		if !needsRenew {
 			if force {
-				lg.Info("certificate does not need to be renewed, but renewal is being forced", "identifier", name, "remaining", timeLeft)
+				lg.Debug("certificate does not need to be renewed, but renewal is being forced", "identifier", name, "remaining", timeLeft)
 			} else {
-				lg.Info("certificate appears to have been renewed already", "identifier", name, "remaining", timeLeft)
+				lg.Debug("certificate appears to have been renewed already", "identifier", name, "remaining", timeLeft)
 				return nil
 			}
 		}
 
-		lg.Info("renewing certificate", "identifier", name, "remaining", timeLeft)
+		lg.Debug("renewing certificate", "identifier", name, "remaining", timeLeft)
 
 		if err := cfg.emit(ctx, "cert_obtaining", map[string]any{
 			"renewal":    true,
@@ -873,7 +873,7 @@ func (cfg *Config) renewCert(ctx context.Context, name string, force, interactiv
 		if err != nil {
 			return fmt.Errorf("[%s] Renew: saving assets: %v", name, err)
 		}
-		lg.Info("certificate renewed successfully", "identifier", name, "issuer", issuerKey)
+		lg.Debug("certificate renewed successfully", "identifier", name, "issuer", issuerKey)
 
 		certKey := newCertRes.NamesKey()
 

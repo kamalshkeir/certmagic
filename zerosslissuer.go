@@ -70,20 +70,20 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		return nil, fmt.Errorf("no identifiers on CSR")
 	}
 
-	lg.Info("creating certificate")
+	lg.Debug("creating certificate")
 
 	cert, err := client.CreateCertificate(ctx, csr, iss.ValidityDays)
 	if err != nil {
 		return nil, fmt.Errorf("creating certificate: %v", err)
 	}
 
-	lg.Info("created certificate", "cert_id", cert.ID)
+	lg.Debug("created certificate", "cert_id", cert.ID)
 
 	defer func(certID string) {
 		if err != nil {
 			err := client.CancelCertificate(context.WithoutCancel(ctx), certID)
 			if err == nil {
-				lg.Info("canceled certificate", "cert_id", cert.ID)
+				lg.Debug("canceled certificate", "cert_id", cert.ID)
 			} else {
 				lg.Error("unable to cancel certificate", "err", err, "cert_id", cert.ID)
 			}
@@ -153,7 +153,7 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		}
 	}
 
-	lg.Info("validating identifiers")
+	lg.Debug("validating identifiers")
 
 	cert, err = client.VerifyIdentifiers(ctx, cert.ID, verificationMethod, nil)
 	if err != nil {
@@ -162,14 +162,14 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 
 	switch cert.Status {
 	case "pending_validation":
-		lg.Info("validations succeeded; waiting for certificate to be issued")
+		lg.Debug("validations succeeded; waiting for certificate to be issued")
 
 		cert, err = iss.waitForCertToBeIssued(ctx, client, cert)
 		if err != nil {
 			return nil, fmt.Errorf("waiting for certificate to be issued: %v", err)
 		}
 	case "issued":
-		lg.Info("validations succeeded; downloading certificate bundle")
+		lg.Debug("validations succeeded; downloading certificate bundle")
 	default:
 		return nil, fmt.Errorf("unexpected certificate status: %s", cert.Status)
 	}
@@ -179,7 +179,7 @@ func (iss *ZeroSSLIssuer) Issue(ctx context.Context, csr *x509.CertificateReques
 		return nil, fmt.Errorf("downloading certificate: %v", err)
 	}
 
-	lg.Info("successfully downloaded issued certificate")
+	lg.Debug("successfully downloaded issued certificate")
 
 	return &IssuedCertificate{
 		Certificate: []byte(bundle.CertificateCrt + bundle.CABundleCrt),

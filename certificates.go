@@ -350,7 +350,7 @@ func (cfg *Config) managedCertInStorageExpiresSoon(ctx context.Context, cert Cer
 // already in storage. It returns the newly-loaded certificate if successful.
 func (cfg *Config) reloadManagedCertificate(ctx context.Context, oldCert Certificate) (Certificate, error) {
 	newCert, err := cfg.loadManagedCertificate(ctx, oldCert.Names[0])
-	lg.Info("reloading managed certificate", "identifiers", oldCert.Names)
+	lg.Debug("reloading managed certificate", "identifiers", oldCert.Names)
 	if err != nil {
 		return Certificate{}, fmt.Errorf("loading managed certificate for %v from storage: %v", oldCert.Names, err)
 	}

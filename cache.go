@@ -289,7 +289,7 @@ func (certCache *Cache) replaceCertificate(oldCert, newCert Certificate) {
 	certCache.removeCertificate(oldCert)
 	certCache.unsyncedCacheCertificate(newCert)
 	certCache.mu.Unlock()
-	lg.Info("replaced certificate in cache", "subjects", newCert.Names, "new_expiration", expiresAt(newCert.Leaf))
+	lg.Debug("replaced certificate in cache", "subjects", newCert.Names, "new_expiration", expiresAt(newCert.Leaf))
 }
 
 // getAllMatchingCerts returns all certificates with exactly this subject

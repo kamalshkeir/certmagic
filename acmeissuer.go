@@ -439,7 +439,7 @@ func (am *ACMEIssuer) doIssue(ctx context.Context, csr *x509.CertificateRequest,
 	// do this in a loop because there's an error case that may necessitate a retry, but not more than once
 	var certChains []acme.Certificate
 	for i := 0; i < 2; i++ {
-		lg.Info("using ACME account", "account_id", params.Account.Location, "account_contact", params.Account.Contact)
+		lg.Debug("using ACME account", "account_id", params.Account.Location, "account_contact", params.Account.Contact)
 
 		certChains, err = client.acmeClient.ObtainCertificate(ctx, params)
 		if err != nil {

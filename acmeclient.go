@@ -264,13 +264,13 @@ func (c *acmeClient) throttle(ctx context.Context, names []string) error {
 		// TODO: stop rate limiter when it is garbage-collected...
 	}
 	rateLimitersMu.Unlock()
-	lg.Info("waiting on internal rate limiter")
-	lg.Info("waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
+	lg.Debug("waiting on internal rate limiter")
+	lg.Debug("waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
 	err := rl.Wait(ctx)
 	if err != nil {
 		return err
 	}
-	lg.Info("done waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
+	lg.Debug("done waiting on internal rate limiter", "identifiers", names, "ca", c.acmeClient.Directory, "account", email)
 	return nil
 }
 

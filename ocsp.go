@@ -22,10 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
+	"github.com/kamalshkeir/lg"
 	"golang.org/x/crypto/ocsp"
 )
 
@@ -84,7 +84,7 @@ func stapleOCSP(ctx context.Context, ocspConfig OCSPConfig, storage Storage, cer
 			// file gets in the folder. in this case we are sure it is corrupt.)
 			err := storage.Delete(ctx, ocspStapleKey)
 			if err != nil {
-				log.Printf("[WARNING] Unable to delete invalid OCSP staple file: %v", err)
+				lg.Warn("unable to delete invalid OCSP staple file", "err", err)
 			}
 		}
 	}

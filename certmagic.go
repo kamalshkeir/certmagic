@@ -40,13 +40,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kamalshkeir/lg"
 )
 
 var UsedHTTPServer *http.Server
@@ -144,8 +145,7 @@ func HTTPS(domainNames []string, mux http.Handler) error {
 		BaseContext:       func(listener net.Listener) context.Context { return ctx },
 	}
 	UsedHTTPServer = httpsServer
-	log.Printf("%v Serving HTTP->HTTPS on %s and %s",
-		domainNames, hln.Addr(), hsln.Addr())
+	lg.Debug("Serving HTTP->HTTPS on", "http_addr", hln.Addr(), "https_addr", hsln.Addr())
 
 	go httpServer.Serve(hln)
 	return httpsServer.Serve(hsln)

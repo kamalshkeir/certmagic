@@ -159,7 +159,7 @@ func (c *Client) ObtainCertificate(ctx context.Context, params OrderParameters) 
 		return nil, fmt.Errorf("solving challenges: %w (order=%s)", err, order.Location)
 	}
 
-	lg.Info("validations succeeded; finalizing order", "order", order.Location)
+	lg.Debug("validations succeeded; finalizing order", "order", order.Location)
 
 	// get the CSR
 	csr, err := params.CSR.CSR(ctx, params.Identifiers)
@@ -189,9 +189,9 @@ func (c *Client) ObtainCertificate(ctx context.Context, params OrderParameters) 
 	}
 
 	if len(certChains) == 0 {
-		lg.Info("no certificate chains offered by server", "order", order.Location)
+		lg.Debug("no certificate chains offered by server", "order", order.Location)
 	} else {
-		lg.Info("successfully downloaded certificate chain", "count", len(certChains), "first_url", certChains[0].URL)
+		lg.Debug("successfully downloaded certificate chain", "count", len(certChains), "first_url", certChains[0].URL)
 	}
 
 	return certChains, nil
@@ -361,7 +361,7 @@ func (c *Client) solveChallenges(ctx context.Context, account acme.Account, orde
 func (c *Client) presentForNextChallenge(ctx context.Context, authz *authzState) error {
 	if authz.Status != acme.StatusPending {
 		if authz.Status == acme.StatusValid {
-			lg.Info("authorization already valid", "identifier", authz.IdentifierValue(), "authz_url", authz.Location, "expires", authz.Expires)
+			lg.Debug("authorization already valid", "identifier", authz.IdentifierValue(), "authz_url", authz.Location, "expires", authz.Expires)
 		}
 		return nil
 	}
@@ -370,7 +370,7 @@ func (c *Client) presentForNextChallenge(ctx context.Context, authz *authzState)
 	if err != nil {
 		return err
 	}
-	lg.Info("trying to solve challenge", "identifier", authz.IdentifierValue(), "challenge_type", authz.currentChallenge.Type, "ca", c.Directory)
+	lg.Debug("trying to solve challenge", "identifier", authz.IdentifierValue(), "challenge_type", authz.currentChallenge.Type, "ca", c.Directory)
 
 	err = authz.currentSolver.Present(ctx, authz.currentChallenge)
 	if err != nil {
@@ -506,7 +506,7 @@ func (c *Client) pollAuthorization(ctx context.Context, account acme.Account, au
 		}
 		return fmt.Errorf("[%s] %w", authz.Authorization.IdentifierValue(), err)
 	}
-	lg.Info("authorization finalized", "identifier", authz.IdentifierValue(), "authz_status", authz.Status)
+	lg.Debug("authorization finalized", "identifier", authz.IdentifierValue(), "authz_status", authz.Status)
 
 	return nil
 }

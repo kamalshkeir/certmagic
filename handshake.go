@@ -70,7 +70,7 @@ func (cfg *Config) GetCertificateWithContext(ctx context.Context, clientHello *t
 				lg.Error("tls-alpn challenge", "server_name", clientHello.ServerName, "remote", clientHello.Conn.RemoteAddr().String(), "error", err)
 				return nil, err
 			}
-			lg.Info("served key authentication certificate", "server_name", clientHello.ServerName, "challenge", "tls-alpn-01", "remote", clientHello.Conn.RemoteAddr().String(), "distributed", distributed)
+			lg.Debug("served key authentication certificate", "server_name", clientHello.ServerName, "challenge", "tls-alpn-01", "remote", clientHello.Conn.RemoteAddr().String(), "distributed", distributed)
 			return challengeCert, nil
 		}
 	}
@@ -462,7 +462,7 @@ func (cfg *Config) obtainOnDemandCertificate(ctx context.Context, hello *tls.Cli
 		obtainCertWaitChansMu.Unlock()
 	}
 
-	lg.Info("obtaining new certificate", "server_name", name)
+	lg.Debug("obtaining new certificate", "server_name", name)
 
 	// set a timeout so we don't inadvertently hold a client handshake open too long
 	// (timeout duration is based on https://caddy.community/t/zerossl-dns-challenge-failing-often-route53-plugin/13822/24?u=matt)
@@ -617,7 +617,7 @@ func (cfg *Config) renewDynamicCertificate(ctx context.Context, hello *tls.Clien
 			return Certificate{}, err
 		}
 
-		lg.Info("attempting certificate renewal", "server_name", name)
+		lg.Debug("attempting certificate renewal", "server_name", name)
 
 		// otherwise, renew with issuer, etc.
 		var newCert Certificate

@@ -57,7 +57,7 @@ func (certCache *Cache) maintainAssets(panicCount int) {
 	ocspTicker := time.NewTicker(certCache.options.OCSPCheckInterval)
 	certCache.optionsMu.RUnlock()
 
-	lg.Info("started background certificate maintenance", "cache", fmt.Sprintf("%p", certCache))
+	lg.Debug("started background certificate maintenance", "cache", fmt.Sprintf("%+v", certCache))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -74,7 +74,7 @@ func (certCache *Cache) maintainAssets(panicCount int) {
 		case <-certCache.stopChan:
 			renewalTicker.Stop()
 			ocspTicker.Stop()
-			lg.Info("stopped background certificate maintenance", "cache", fmt.Sprintf("%p", certCache))
+			lg.Debug("stopped background certificate maintenance", "cache", fmt.Sprintf("%p", certCache))
 			close(certCache.doneChan)
 			return
 		}
@@ -159,7 +159,7 @@ func (certCache *Cache) RenewManagedCertificates(ctx context.Context) error {
 	// Reload certificates that merely need to be updated in memory
 	for _, oldCert := range reloadQueue {
 		timeLeft := expiresAt(oldCert.Leaf).Sub(time.Now().UTC())
-		lg.Info("certificate expires soon, but is already renewed in storage; reloading stored certificate", "identifiers", oldCert.Names, "remaining", timeLeft)
+		lg.Debug("certificate expires soon, but is already renewed in storage; reloading stored certificate", "identifiers", oldCert.Names, "remaining", timeLeft)
 		cfg := configs[oldCert.Names[0]]
 
 		// crucially, this happens OUTSIDE a lock on the certCache
@@ -192,7 +192,7 @@ func (certCache *Cache) RenewManagedCertificates(ctx context.Context) error {
 
 func (certCache *Cache) queueRenewalTask(ctx context.Context, oldCert Certificate, cfg *Config) error {
 	timeLeft := expiresAt(oldCert.Leaf).Sub(time.Now().UTC())
-	lg.Info("certificate expires soon; queuing for renewal", "identifiers", oldCert.Names, "remaining", timeLeft)
+	lg.Debug("certificate expires soon; queuing for renewal", "identifiers", oldCert.Names, "remaining", timeLeft)
 
 	// Get the name which we should use to renew this certificate;
 	// we only support managing certificates with one name per cert,
@@ -202,7 +202,7 @@ func (certCache *Cache) queueRenewalTask(ctx context.Context, oldCert Certificat
 	// queue up this renewal job (is a no-op if already active or queued)
 	jm.Submit("renew_"+renewName, func() error {
 		timeLeft := expiresAt(oldCert.Leaf).Sub(time.Now().UTC())
-		lg.Info("attempting certificate renewal", "identifiers", oldCert.Names, "remaining", timeLeft)
+		lg.Debug("attempting certificate renewal", "identifiers", oldCert.Names, "remaining", timeLeft)
 
 		// perform renewal - crucially, this happens OUTSIDE a lock on certCache
 		err := cfg.RenewCertAsync(ctx, renewName, false)
@@ -314,7 +314,7 @@ func (certCache *Cache) updateOCSPStaples(ctx context.Context) {
 		// sure we apply the update to all names on the certificate if
 		// the status is still Good.
 		if cert.ocsp != nil && cert.ocsp.Status == ocsp.Good && (lastNextUpdate.IsZero() || lastNextUpdate != cert.ocsp.NextUpdate) {
-			lg.Info("advancing OCSP staple", "identifiers", cert.Names, "from", lastNextUpdate, "to", cert.ocsp.NextUpdate)
+			lg.Debug("advancing OCSP staple", "identifiers", cert.Names, "from", lastNextUpdate, "to", cert.ocsp.NextUpdate)
 			updated[certHash] = ocspUpdate{rawBytes: cert.Certificate.OCSPStaple, parsed: cert.ocsp}
 		}
 
@@ -350,7 +350,7 @@ func (certCache *Cache) updateOCSPStaples(ctx context.Context) {
 	for _, renew := range renewQueue {
 		_, err := renew.cfg.forceRenew(ctx, renew.oldCert)
 		if err != nil {
-			lg.Info("forcefully renewing certificate due to REVOKED status", "identifiers", renew.oldCert.Names, "error", err)
+			lg.Debug("forcefully renewing certificate due to REVOKED status", "identifiers", renew.oldCert.Names, "error", err)
 		}
 	}
 }
@@ -408,13 +408,13 @@ func CleanStorage(ctx context.Context, storage Storage, opts CleanStorageOptions
 			lastTLSClean := lastClean["tls"]
 			if time.Since(lastTLSClean.Timestamp) < opts.Interval {
 				nextTime := time.Now().Add(opts.Interval)
-				lg.Info("storage cleaning happened too recently; skipping for now", "instance", lastTLSClean.InstanceID, "try_again", nextTime, "try_again_in", time.Until(nextTime))
+				lg.Debug("storage cleaning happened too recently; skipping for now", "instance", lastTLSClean.InstanceID, "try_again", nextTime, "try_again_in", time.Until(nextTime))
 				return nil
 			}
 		}
 	}
 
-	lg.Info("cleaning storage unit")
+	lg.Debug("cleaning storage unit")
 
 	if opts.OCSPStaples {
 		err := deleteOldOCSPStaples(ctx, storage)
@@ -539,14 +539,14 @@ func deleteExpiredCerts(ctx context.Context, storage Storage, gracePeriod time.D
 				}
 
 				if expiredTime := time.Since(expiresAt(cert)); expiredTime >= gracePeriod {
-					lg.Info("certificate expired beyond grace period; cleaning up", "asset_key", assetKey, "expired_for", expiredTime, "grace_period", gracePeriod)
+					lg.Debug("certificate expired beyond grace period; cleaning up", "asset_key", assetKey, "expired_for", expiredTime, "grace_period", gracePeriod)
 					baseName := strings.TrimSuffix(assetKey, ".crt")
 					for _, relatedAsset := range []string{
 						assetKey,
 						baseName + ".key",
 						baseName + ".json",
 					} {
-						lg.Info("deleting asset because resource expired", "asset_key", relatedAsset)
+						lg.Debug("deleting asset because resource expired", "asset_key", relatedAsset)
 						err := storage.Delete(ctx, relatedAsset)
 						if err != nil {
 							lg.Error("could not clean up asset related to expired certificate", "asset_key", relatedAsset, "error", err)
@@ -561,7 +561,7 @@ func deleteExpiredCerts(ctx context.Context, storage Storage, gracePeriod time.D
 				continue
 			}
 			if len(siteAssets) == 0 {
-				lg.Info("deleting site folder because key is empty", "site_key", siteKey)
+				lg.Debug("deleting site folder because key is empty", "site_key", siteKey)
 				err := storage.Delete(ctx, siteKey)
 				if err != nil {
 					return fmt.Errorf("deleting empty site folder %s: %v", siteKey, err)
@@ -645,7 +645,7 @@ func (cfg *Config) moveCompromisedPrivateKey(ctx context.Context, cert Certifica
 		return err
 	}
 
-	lg.Info("removed certificate's compromised private key from use", "storage_path", compromisedPrivKeyStorageKey, "identifiers", cert.Names, "issuer", cert.issuerKey)
+	lg.Debug("removed certificate's compromised private key from use", "storage_path", compromisedPrivKeyStorageKey, "identifiers", cert.Names, "issuer", cert.issuerKey)
 
 	return nil
 }
