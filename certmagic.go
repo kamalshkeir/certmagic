@@ -53,6 +53,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var UsedHTTPServer *http.Server
+
 // HTTPS serves mux for all domainNames using the HTTP
 // and HTTPS ports, redirecting all HTTP requests to HTTPS.
 // It uses the Default config and a background context.
@@ -145,7 +147,7 @@ func HTTPS(domainNames []string, mux http.Handler) error {
 		Handler:           mux,
 		BaseContext:       func(listener net.Listener) context.Context { return ctx },
 	}
-
+	UsedHTTPServer = httpsServer
 	log.Printf("%v Serving HTTP->HTTPS on %s and %s",
 		domainNames, hln.Addr(), hsln.Addr())
 
